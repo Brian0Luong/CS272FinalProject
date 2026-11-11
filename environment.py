@@ -77,8 +77,69 @@ class DrivingEnv:
             info.update(scenario=self.scenario, vehicle_count=len(base.road.vehicles))
             return self.observation(self.lidar(ego, 25.0)), info
 
+    def lidar(self, observer, maximum_range):
+        """
+        - split 2D scan into 16 sectors and cast 16 rays per sector
+        - check each ray against vehicle rectangles using their actual orientation
+        - keep only first hit on each ray, closer vehicles block farther ones.
+        - closest hit in each sector report normalized distance and relative speed along the ray
+        - run the scan from any vehicle's pov
+        """
+        angles = np.arange(256) * (2 * np.pi / 256) + observer.heading
+        directions = np.column_stack((np.cos(angles), np.sin(angles)))
+        distance = np.full(256, maximum_range, dtype=float)
+        radial = np.zeros(256)
+        for vehicle in self.env.unwrapped.road.vehicles:
+            if vehicle is observer:
+                continue
+            c, s = np.cos(vehicle.heading), np.sin(vehicle.heading)
+            rotation = np.array([[c, -s], [s, c]])
+            origin = (observer.position - vehicle.position) @ rotation
+            rays = directions @ rotation
+            half = np.array([vehicle.LENGTH, vehicle.WIDTH]) / 2
+            parallel = np.abs(rays) < 1e-10
+            safe = np.where(parallel, 1.0, rays)
+            lo = (-half - origin) / safe
+            hi = (half - origin) / safe
+            near = np.where(parallel, -np.inf, np.minimum(lo, hi)).max(axis=1)
+            far = np.where(parallel, np.inf, np.maximum(lo, hi)).min(axis=1)
+            outside = (parallel & (np.abs(origin) > half)).any(axis=1)
+            hit = np.maximum(near, 0.0)
+            valid = (~outside) & (far >= hit) & (hit < distance)
+            distance[valid] = hit[valid]
+            relative_velocity = vehicle.velocity - observer.velocity
+            radial[valid] = directions[valid] @ relative_velocity
+        ranges = distance.reshape(16, 16)
+        indices = np.argmin(ranges, axis=1)
+        speed = radial.reshape(16, 16)[np.arange(16), indices]
+        return np.column_stack((ranges.min(axis=1) / maximum_range,
+                                np.clip(speed / maximum_range, -1, 1))).astype(np.float32)
+
+    def neighbors(self):
+        """
+        find the nearest front and back target lane cars
+        """
+        base = self.env.unwrapped
+        ego = base.vehicle
+        current = ego.lane_index
+        lane_id = self.target_lane
+        lane = (current[0], current[1], lane_id)
+        same = [v for v in base.road.vehicles if v is not ego and v.lane_index == lane]
+        front = [v for v in same if v.position[0] >= ego.position[0]]
+        rear = [v for v in same if v.position[0] < ego.position[0]]
+        return (min(front, key=lambda v: v.position[0], default=None),
+                max(rear, key=lambda v: v.position[0], default=None))
+
     def step(self, driving_action, reply):
         raise NotImplementedError("Not implemented yet")
+
+    def observation(self, scan):
+        """
+        assemble 36-value observation
+        """
+        v = self.env.unwrapped.vehicle
+        return np.r_[np.asarray(scan, dtype=np.float32).reshape(-1), v.speed / 40,
+                     v.lane_index[2] / 2, self.target_lane / 2, v.position[1] / 8].astype(np.float32)
 
     def close(self):
         self.env.close()
