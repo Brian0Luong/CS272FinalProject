@@ -25,7 +25,7 @@ class Truck(Intent):
 
 class DrivingEnv:
     def __init__(self, bits_price=0.01, seed=11, scenario=None, render_mode=None):
-            if scenario not in (None, 'lead_braking', 'truck_occlusion', 'mixed'):
+            if scenario not in (None, 'lead_braking', 'truck_occlusion', 'mixed', "wide_gap", "closing_gap",):
                 raise ValueError('Unknown scenario')
             self.scenario_choice = scenario
             self.bits_price = bits_price
@@ -50,24 +50,38 @@ class DrivingEnv:
             ego.target_speed = 25.0; ego.heading = 0.0
             base.road.vehicles = [ego]
             self.scenario = self.scenario_choice or str(rng.choice(['lead_braking', 'truck_occlusion', 'mixed']))
+            truck_scenario = self.scenario == "truck_occlusion"
             scenarios = [
-                (1, rng.uniform(16, 20) if self.scenario == 'truck_occlusion' else rng.uniform(45, 60), rng.uniform(23, 26)),
-                (2, rng.uniform(22, 28), rng.uniform(23, 27)),
+                (1, 13.0 if truck_scenario else rng.uniform(45, 60),
+                rng.uniform(23, 26)),
+                (2, 32.0 if truck_scenario else rng.uniform(22, 28),
+                rng.uniform(23, 27)),
                 (2, rng.uniform(-25, -18), rng.uniform(24, 28)),
                 (2, rng.uniform(55, 65), rng.uniform(24, 27)),
             ]
-            if self.scenario == 'truck_occlusion':
-                scenarios.append((1, 34.0, rng.uniform(22, 25)))
+
+            if truck_scenario:
+                scenarios.append((1, 22.0, rng.uniform(22, 25)))
             for lane_index in range(3):
                 for dx in (-95.0, -60.0, 95.0, 140.0):
                     if rng.random() < 0.45:
                         scenarios.append((lane_index, dx + rng.uniform(-4, 4), rng.uniform(20, 30)))
+            gap_demo = self.scenario in ("wide_gap", "closing_gap")
+            if gap_demo:
+                rear_dx = -45.0 if self.scenario == "wide_gap" else -10.0
+                scenarios = [
+                    (2, 150.0, 32.0),
+                    (2, rear_dx, 32.0),
+                ]
             for idx, (lane_index, dx, speed) in enumerate(scenarios):
                 cls = Truck if idx == 0 and self.scenario == 'truck_occlusion' else Intent
                 v = cls(base.road, np.array([100.0 + dx, 4.0 * lane_index]),
                                speed=float(speed), enable_lane_change=False)
-                desired_change = float(rng.choice([0.0, 5.0, -5.0]))
-                v.target_speed = max(5.0, v.speed + desired_change)
+                if gap_demo:
+                    v.target_speed = v.speed
+                else:
+                    desired_change = float(rng.choice([0.0, 5.0, -5.0]))
+                    v.target_speed = max(5.0, v.speed + desired_change)
                 if idx == 3 and self.scenario == 'lead_braking':
                     v.target_speed = v.speed
                     v.brake_at = float(rng.uniform(1.0, 2.0))
