@@ -3,6 +3,7 @@ import numpy as np
 from gymnasium import spaces
 
 from stable_baselines3 import PPO
+from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.env_checker import check_env
 
 from environment import DrivingEnv
@@ -16,6 +17,7 @@ class RequestEnv(gym.Env):
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(36,), dtype=np.float32
         )
+        self.obs = None
 
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
@@ -37,10 +39,23 @@ class RequestEnv(gym.Env):
 
 def train_ppo(planner, total_timesteps=4_096, bits_price=0.1):
     env = RequestEnv(planner, bits_price=bits_price)
+    eval_env = RequestEnv(planner, bits_price=bits_price)
+
     try:
         check_env(env)
-        policy = PPO("MlpPolicy", env, seed=11, verbose=1)
+        policy = PPO("MlpPolicy",
+                     env, seed=11, verbose=1)
+
+        eval_callback = EvalCallback(
+            eval_env,
+            best_model_save_path="./models/best/",
+            log_path="./logs/",
+            eval_freq=5000,
+            deterministic=True
+        )
         policy.learn(total_timesteps=total_timesteps)
         policy.save("request_policy_smoke")
+
+        return policy
     finally:
         env.close()
