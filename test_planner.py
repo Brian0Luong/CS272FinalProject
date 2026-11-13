@@ -25,20 +25,20 @@ def planner(obs, reply):
             return BRAKE
         if neighbor == "rear" and data == "accelerate":
             return BRAKE
-        if kind == "unavailable":
-            return MAINTAIN
-
-        target_y = target_lane * 4.0
-
-        # close enough to target
-        if abs(ego_y - target_y) < 0.5:
-            if ego_speed < 20:
-                return ACCELERATE
-            if ego_speed > 30:
-                return BRAKE
-            return MAINTAIN
-
-        if current_lane != target_lane:
-            return CHANGE_LANE
-
+    if kind == "unavailable":
         return MAINTAIN
+
+    target_y = target_lane * 4.0
+
+    # close enough to target
+    if abs(ego_y - target_y) < 0.5:
+        if ego_speed < 20:
+            return ACCELERATE
+        if ego_speed > 30:
+            return BRAKE
+        return MAINTAIN
+
+    if current_lane != target_lane:
+        return CHANGE_LANE
+
+    return MAINTAIN
