@@ -144,6 +144,31 @@ class DrivingEnv:
         return (min(front, key=lambda v: v.position[0], default=None),
                 max(rear, key=lambda v: v.position[0], default=None))
 
+    def request(self, action):
+        if self.pending:
+            raise RuntimeError('Only one request is allowed before a driving step')
+        if action not in range(5):
+            raise ValueError('Request action must be an integer from 0 to 4')
+        self.pending = True
+        if action == 0:
+            return {'kind': 'none', 'neighbor': None, 'data': None, 'bits': 0}
+        vehicle = self.neighbors()[0 if action in (1, 3) else 1]
+        side = 'front' if action in (1, 3) else 'rear'
+        if vehicle is None:
+            self.requests += 1
+            self.bits += 1
+            return {'kind': 'unavailable', 'neighbor': side, 'data': None, 'bits': 1}
+        self.requests += 1
+        if action in (1, 2):
+            label = vehicle.intent
+            self.bits += 2
+            return {'kind': 'intent', 'neighbor': side, 'data': label, 'bits': 2}
+        readings = self.lidar(vehicle, 60.0)
+        quantized = np.round(np.clip(readings, -1, 1) * 32767).astype(np.int16)
+        bits = quantized.size * 16
+        self.bits += bits
+        return {'kind': 'lidar', 'neighbor': side, 'data': quantized, 'bits': bits}
+
     def step(self, driving_action, reply):
         raise NotImplementedError("Not implemented yet")
 
