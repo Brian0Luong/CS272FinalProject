@@ -170,7 +170,26 @@ class DrivingEnv:
         return {'kind': 'lidar', 'neighbor': side, 'data': quantized, 'bits': bits}
 
     def step(self, driving_action, reply):
-        raise NotImplementedError("Not implemented yet")
+        if self.episode_done:
+            raise RuntimeError('Reset before stepping a finished episode')
+        if not self.pending:
+            raise RuntimeError('Choose a request before the driving action')
+        obs, _, terminated, truncated, info = self.env.step(driving_action)
+        self.steps += 1
+        ego = self.env.unwrapped.vehicle
+        target = (ego.lane_index[0], ego.lane_index[1], self.target_lane)
+        lane = self.env.unwrapped.road.network.get_lane(target)
+        lateral_error = abs(lane.local_coordinates(ego.position)[1])
+        success = ego.lane_index[2] == self.target_lane and lateral_error < 0.5 and not ego.crashed
+        reward = 10.0 if success else -10.0 if ego.crashed else -0.1
+        terminated = bool(terminated or success)
+        self.episode_done = terminated or truncated
+        info.update(success=bool(success), collision=bool(ego.crashed), steps=self.steps,
+                    scenario=self.scenario, vehicle_count=len(self.env.unwrapped.road.vehicles))
+        self.pending = False
+        info.update(driving_reward=float(reward), communication_bits=reply['bits'],
+                    communication_cost=self.bits_price * reply['bits'] / 1000)
+        return self.observation(self.lidar(ego, 25.0)), float(reward) - info['communication_cost'], terminated, truncated, info
 
     def observation(self, scan):
         """
