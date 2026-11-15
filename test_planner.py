@@ -1,9 +1,9 @@
 import numpy as np
 
-MAINTAIN = 0
-ACCELERATE = 1
-BRAKE = 2
-CHANGE_LANE = 3
+MAINTAIN = 1
+CHANGE_LANE = 2
+ACCELERATE = 3
+BRAKE = 4
 
 
 def planner(obs, reply):
