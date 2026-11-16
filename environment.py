@@ -50,7 +50,7 @@ class DrivingEnv:
             ego.position = np.array([100.0, 4.0]); ego.speed = 25.0
             ego.target_speed = 25.0; ego.heading = 0.0
             base.road.vehicles = [ego]
-            self.scenario = self.scenario_choice or str(rng.choice(['lead_braking', 'truck_occlusion', 'mixed']))
+            self.scenario = self.scenario_choice or str(rng.choice(['lead_braking', 'truck_occlusion', 'mixed', *COOP_SCENARIOS]))
             if self.scenario == "coop_mix":
                 self.scenario = str(rng.choice(COOP_SCENARIOS))
             truck_scenario = self.scenario == "truck_occlusion"
