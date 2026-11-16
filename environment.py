@@ -23,9 +23,10 @@ class Truck(Intent):
     LENGTH = 12.0
     WIDTH = 2.5
 
+COOP_SCENARIOS = ("coop_easy", "coop_front", "coop_rear")
 class DrivingEnv:
     def __init__(self, bits_price=0.01, seed=11, scenario=None, render_mode=None):
-            if scenario not in (None, 'lead_braking', 'truck_occlusion', 'mixed', "wide_gap", "closing_gap",):
+            if scenario not in (None, 'lead_braking', 'truck_occlusion', 'mixed', "coop_easy", "coop_front", "coop_rear", "coop_mix"):
                 raise ValueError('Unknown scenario')
             self.scenario_choice = scenario
             self.bits_price = bits_price
@@ -50,6 +51,8 @@ class DrivingEnv:
             ego.target_speed = 25.0; ego.heading = 0.0
             base.road.vehicles = [ego]
             self.scenario = self.scenario_choice or str(rng.choice(['lead_braking', 'truck_occlusion', 'mixed']))
+            if self.scenario == "coop_mix":
+                self.scenario = str(rng.choice(COOP_SCENARIOS))
             truck_scenario = self.scenario == "truck_occlusion"
             scenarios = [
                 (1, 13.0 if truck_scenario else rng.uniform(45, 60),
@@ -66,18 +69,30 @@ class DrivingEnv:
                 for dx in (-95.0, -60.0, 95.0, 140.0):
                     if rng.random() < 0.45:
                         scenarios.append((lane_index, dx + rng.uniform(-4, 4), rng.uniform(20, 30)))
-            gap_demo = self.scenario in ("wide_gap", "closing_gap")
-            if gap_demo:
-                rear_dx = -45.0 if self.scenario == "wide_gap" else -10.0
+            coop_scenario = self.scenario in COOP_SCENARIOS
+            # easy merge: both neighbors match ego car's speed and leave a wide gap
+            if self.scenario == "coop_easy":
+                scenarios = [(2, 55.0, 25.0), (2, -45.0, 25.0)]
+            # front hazard: two slow cars ahead are beyond the ego car's LiDAR range
+            # front neighbor's scan can reveal the slower car ahead of it
+            elif self.scenario == "coop_front":
                 scenarios = [
-                    (2, 150.0, 32.0),
-                    (2, rear_dx, 32.0),
+                    (2, rng.uniform(18.0, 22.0), rng.uniform(4.0, 7.0)),
+                    (2, rng.uniform(42.0, 46.0), 4.0),
+                    (2, -45.0, 25.0),
+                ]
+            # rear hazard: fast rear car starts just beyond ego car's LiDAR range
+            # the fast rear car's scan can show how quickly its catching up to the ego
+            elif self.scenario == "coop_rear":
+                scenarios = [
+                    (2, 55.0, 25.0),
+                    (2, -rng.uniform(28.0, 30.0), rng.uniform(45.0, 48.0)),
                 ]
             for idx, (lane_index, dx, speed) in enumerate(scenarios):
                 cls = Truck if idx == 0 and self.scenario == 'truck_occlusion' else Intent
                 v = cls(base.road, np.array([100.0 + dx, 4.0 * lane_index]),
                                speed=float(speed), enable_lane_change=False)
-                if gap_demo:
+                if coop_scenario:
                     v.target_speed = v.speed
                 else:
                     desired_change = float(rng.choice([0.0, 5.0, -5.0]))
