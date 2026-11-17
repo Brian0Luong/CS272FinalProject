@@ -32,6 +32,7 @@ X = np.concatenate([
 y_state = next_observations.astype(np.float32)
 y_reward = rewards.astype(np.float32).reshape(-1, 1)
 
+# split up training and validation datasets
 splitter = GroupShuffleSplit(
     n_splits=1,
     test_size=0.2,

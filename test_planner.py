@@ -8,7 +8,7 @@ BRAKE = 4
 
 
 # TODO: UPDATE WITH LIDAR INFO
-def planner(obs, reply):
+def planner(obs, reply, request_action=0):
     # decode observation
     ego_speed = obs[32] * 40
     current_lane = int(obs[33] * 2)

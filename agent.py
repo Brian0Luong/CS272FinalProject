@@ -27,7 +27,7 @@ class RequestEnv(gym.Env):
 
     def step(self, request_action):
         reply = self.sim.request(int(request_action))
-        driving_action = self.planner(self.obs, reply)
+        driving_action = self.planner(self.obs, reply, int(request_action))
 
         self.obs, reward, terminated, truncated, info = self.sim.step(
             int(driving_action), reply

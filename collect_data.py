@@ -1,47 +1,7 @@
 import numpy as np
 from environment import DrivingEnv
+from mpc_planner import planner as mpc_plan, encode_reply
 from test_planner import planner
-
-
-def encode_reply(reply):
-    """
-    converts responses from environment into data usable by the network
-    """
-    kind_map = {
-        "none": 0,
-        "intent": 1,
-        "lidar": 2,
-        "unavailable": 3
-    }
-
-    neighbor_map = {
-        None: 0,
-        "front": 1,
-        "rear": 2
-    }
-
-    data = np.zeros(32, dtype=np.float32)
-
-    if reply["kind"] == "intent":
-        intent_map = {
-            "maintain": 0,
-            "accelerate": 1,
-            "brake": 2
-        }
-        data[intent_map[reply["data"]]] = 1.0
-
-    elif reply["kind"] == "lidar":
-        data = (
-                np.asarray(reply["data"], dtype=np.float32).reshape(-1)
-                / 32767.0
-        )
-
-    return (
-        kind_map[reply["kind"]],
-        neighbor_map[reply["neighbor"]],
-        data
-    )
-
 
 
 def collect_data(episodes=500, output_file="driving_dataset.npz"):
@@ -91,7 +51,11 @@ def collect_data(episodes=500, output_file="driving_dataset.npz"):
 
                 reply = sim.request(request_action)
 
-                driving_action = int(planner(obs, reply))
+                # chance to use heuristic or choose a random action
+                if np.random.random() < .5:
+                    driving_action = int(planner(obs, reply, int(request_action)))
+                else:
+                    driving_action = int(np.random.random() * 5)
 
                 next_obs, reward, terminated, truncated, info = sim.step(
                     driving_action, reply

@@ -1,7 +1,8 @@
-
 import tensorflow as tf
+
 layers = tf.keras.layers
 Model = tf.keras.Model
+
 
 def create_world_model(input_dim=85, state_dim=36):
     inputs = layers.Input(shape=(input_dim,))
