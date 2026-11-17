@@ -32,6 +32,11 @@ class RequestEnv(gym.Env):
         self.obs, reward, terminated, truncated, info = self.sim.step(
             int(driving_action), reply
         )
+
+        print(f"rewards: {reward}\n"
+              f"terminated: {terminated}\n"
+              f"truncated: {truncated}\n")
+
         return self.obs, reward, terminated, truncated, info
 
     def close(self):
@@ -51,9 +56,10 @@ def train_ppo(planner, total_timesteps=4_096, bits_price=0.1,render_mode=None):
             best_model_save_path="./models/best/",
             log_path="./logs/",
             eval_freq=5000,
-            deterministic=True
+            deterministic=True,
         )
-        policy.learn(total_timesteps=total_timesteps)
+        policy.learn(total_timesteps=total_timesteps,
+                     callback=eval_callback)
         policy.save("request_policy_smoke")
 
         return policy

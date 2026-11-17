@@ -1,19 +1,22 @@
 
 import numpy as np
 from environment import DrivingEnv
-from mpc_planner import planner
+from mpc_planner import planner as mpc_plan
+from test_planner import planner
 
 scenarios = [
     "lead_braking",
     "truck_occlusion",
     "mixed",
-    "wide_gap",
-    "closing_gap"
+    "coop_front",
+    "coop_easy",
+    "coop_rear",
+    "coop_mix"
 ]
 
 episodes_per_scenario = 10
 
-sim = DrivingEnv(bits_price=0.1)
+sim = DrivingEnv(bits_price=0.1, render_mode="human")
 
 results = []
 
@@ -21,7 +24,7 @@ try:
     for scenario in scenarios:
         for episode in range(episodes_per_scenario):
             sim.scenario_choice = scenario
-            obs, info = sim.reset(seed=11 + episode)
+            obs, info = sim.reset(seed=0 + episode)
 
             terminated = False
             truncated = False
@@ -31,7 +34,7 @@ try:
                 request_action = 0
                 reply = sim.request(request_action)
 
-                driving_action = planner(
+                driving_action = mpc_plan(
                     obs,
                     reply,
                     request_action

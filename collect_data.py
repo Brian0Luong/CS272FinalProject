@@ -14,8 +14,10 @@ def collect_data(episodes=500, output_file="driving_dataset.npz"):
         "lead_braking",
         "truck_occlusion",
         "mixed",
-        "wide_gap",
-        "closing_gap"
+        "coop_front",
+        "coop_easy",
+        "coop_rear",
+        "coop_mix"
     ]
 
     sim = DrivingEnv(bits_price=0.1)
