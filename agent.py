@@ -9,9 +9,9 @@ from stable_baselines3.common.env_checker import check_env
 from environment import DrivingEnv
 
 class RequestEnv(gym.Env):
-    def __init__(self, planner, bits_price=0.1):
+    def __init__(self, planner, bits_price=0.1, render_mode=None):
         super().__init__()
-        self.sim = DrivingEnv(bits_price=bits_price)
+        self.sim = DrivingEnv(bits_price=bits_price, render_mode=render_mode)
         self.planner = planner
         self.action_space = spaces.Discrete(5)
         self.observation_space = spaces.Box(
@@ -37,8 +37,8 @@ class RequestEnv(gym.Env):
     def close(self):
         self.sim.close()
 
-def train_ppo(planner, total_timesteps=4_096, bits_price=0.1):
-    env = RequestEnv(planner, bits_price=bits_price)
+def train_ppo(planner, total_timesteps=4_096, bits_price=0.1,render_mode=None):
+    env = RequestEnv(planner, bits_price=bits_price, render_mode=render_mode)
     eval_env = RequestEnv(planner, bits_price=bits_price)
 
     try:

@@ -6,5 +6,6 @@ if __name__ == "__main__":
     model = train_ppo(
         planner=planner,
         total_timesteps=100_000,
-        bits_price=0.1
+        bits_price=0.1,
+        render_mode="human"
     )

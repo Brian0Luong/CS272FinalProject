@@ -1,11 +1,13 @@
 import numpy as np
 
+LANE_LEFT = 0
 MAINTAIN = 1
-CHANGE_LANE = 2
+LANE_RIGHT = 2
 ACCELERATE = 3
 BRAKE = 4
 
 
+# TODO: UPDATE WITH LIDAR INFO
 def planner(obs, reply):
     # decode observation
     ego_speed = obs[32] * 40
@@ -38,7 +40,9 @@ def planner(obs, reply):
             return BRAKE
         return MAINTAIN
 
-    if current_lane != target_lane:
-        return CHANGE_LANE
+    if current_lane < target_lane:
+        return LANE_RIGHT
+    elif current_lane > target_lane:
+        return LANE_LEFT
 
     return MAINTAIN
