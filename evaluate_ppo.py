@@ -1,6 +1,7 @@
 
 import numpy as np
 from stable_baselines3 import PPO
+from full_communication import FullCommunicationEnv, plan_full
 
 from agent import RequestEnv
 from mpc_planner import planner
@@ -27,41 +28,55 @@ POLICIES = {
     "Rear LiDAR": 4,
     "Random": "random",
     "PPO": "ppo",
+    "Full communication": "full",
 }
 
 def evaluate_episode(policy_name, policy_action, model, scenario, seed):
-    env = RequestEnv(
-        planner=planner,
-        bits_price=BITS_PRICE,
-        scenario=scenario,
-    )
+    full = policy_action == "full"
+
+    if full:
+        env = FullCommunicationEnv(
+            scenario=scenario, bits_price=BITS_PRICE, render_mode=None
+        )
+        reset_seed = int(np.random.default_rng(seed).integers(0, 2**31))
+    else:
+        env = RequestEnv(
+            planner=planner, bits_price=BITS_PRICE, render_mode=None
+        )
+        env.sim.scenario_choice = scenario
+        reset_seed = seed
 
     rng = np.random.default_rng(seed)
-    obs, info = env.reset(seed=seed)
-
     total_reward = 0.0
     total_bits = 0
     request_counts = np.zeros(5, dtype=int)
 
-    terminated = False
-    truncated = False
-
     try:
+        obs, _ = env.reset(seed=reset_seed)
+        terminated = truncated = False
+
         while not (terminated or truncated):
-            if policy_action == "ppo":
-                action, _ = model.predict(obs, deterministic=True)
-                action = int(np.asarray(action).item())
-            elif policy_action == "random":
-                action = int(rng.integers(0, 5))
+            if full:
+                bundle = env.request_all()
+                driving_action = plan_full(obs, bundle)
+                request_counts[1:5] += 1
+                obs, reward, terminated, truncated, info = env.step(
+                    driving_action, bundle
+                )
             else:
-                action = int(policy_action)
+                if policy_action == "ppo":
+                    action, _ = model.predict(obs, deterministic=True)
+                    action = int(np.asarray(action).item())
+                elif policy_action == "random":
+                    action = int(rng.integers(0, 5))
+                else:
+                    action = int(policy_action)
 
-            request_counts[action] += 1
-
-            obs, reward, terminated, truncated, info = env.step(action)
+                request_counts[action] += 1
+                obs, reward, terminated, truncated, info = env.step(action)
 
             total_reward += float(reward)
-            total_bits += int(info["request_bits"])
+            total_bits += int(info["communication_bits"])
 
         return {
             "scenario": scenario,
@@ -73,7 +88,6 @@ def evaluate_episode(policy_name, policy_action, model, scenario, seed):
             "bits": total_bits,
             "requests": request_counts,
         }
-
     finally:
         env.close()
 
