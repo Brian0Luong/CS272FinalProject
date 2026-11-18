@@ -5,8 +5,8 @@ from mpc_planner import planner as mpc_plan
 
 if __name__ == "__main__":
     model = train_ppo(
-        planner=planner,  # or use planner
+        planner=mpc_plan,  # or use planner
         total_timesteps=100_000,
         bits_price=0.1,
-        render_mode="human"
+        render_mode=None
     )

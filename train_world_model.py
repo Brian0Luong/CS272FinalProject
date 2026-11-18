@@ -1,6 +1,8 @@
 
 import numpy as np
+import tensorflow as tf
 from sklearn.model_selection import GroupShuffleSplit
+from sklearn.metrics import classification_report, confusion_matrix
 from world_model import create_world_model
 
 data = np.load("driving_dataset.npz")
@@ -47,6 +49,12 @@ train_idx, val_idx = next(splitter.split(
 
 model = create_world_model()
 
+early_stopping = tf.keras.callbacks.EarlyStopping(
+    monitor="val_loss",
+    patience=8,
+    restore_best_weights=True
+)
+
 history = model.fit(
     X[train_idx],
     {
@@ -60,8 +68,9 @@ history = model.fit(
             "reward": y_reward[val_idx]
         }
     ),
-    epochs=50,
+    epochs=100,
     batch_size=64,
+    callbacks=[early_stopping],
     verbose=1
 )
 

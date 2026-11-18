@@ -11,9 +11,19 @@ BRAKE = 4
 
 model = tf.keras.models.load_model("world_model.keras")
 
+@tf.function(reduce_retracing=True)
+def predict_model(inputs):
+    return model(inputs, training=False)
+
 HORIZON = 3
 DISCOUNT = 0.95
-ACTIONS = [LANE_LEFT, MAINTAIN, LANE_RIGHT, ACCELERATE, BRAKE]
+ACTIONS = [
+    LANE_LEFT,
+    MAINTAIN,
+    LANE_RIGHT,
+    ACCELERATE,
+    BRAKE
+]
 
 
 def encode_reply(reply):
@@ -55,6 +65,7 @@ def encode_reply(reply):
         data
     )
 
+
 def planner(obs, reply, request_action):
     sequences = np.array(
         list(itertools.product(ACTIONS, repeat=HORIZON))
@@ -74,7 +85,6 @@ def planner(obs, reply, request_action):
 
     for step in range(HORIZON):
         driving_actions = sequences[:, step]
-
         driving_onehot = np.eye(5)[driving_actions]
 
         if step == 0:
@@ -128,15 +138,16 @@ def planner(obs, reply, request_action):
             reply_batch
         ], axis=1).astype(np.float32)
 
-        predicted_states, predicted_rewards = model.predict(
-            model_input,
-            verbose=0
+        predicted_states, predicted_rewards = predict_model(
+            model_input
         )
 
+        predicted_states = predicted_states.numpy()
+        predicted_rewards = predicted_rewards.numpy()
+
         total_rewards += (DISCOUNT ** step) * predicted_rewards.flatten()
-
         states = predicted_states
+    best_index = np.argmax(total_rewards)
+    best_sequence = sequences[best_index]
 
-    best_sequence = np.argmax(total_rewards)
-
-    return int(sequences[best_sequence, 0])
+    return int(best_sequence[0])

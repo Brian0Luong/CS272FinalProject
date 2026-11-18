@@ -5,8 +5,19 @@ from gymnasium import spaces
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.env_checker import check_env
+from stable_baselines3.common.monitor import Monitor
 
 from environment import DrivingEnv
+
+scenarios = [
+    "lead_braking",
+    "truck_occlusion",
+    "mixed",
+    "coop_easy",
+    "coop_front",
+    "coop_rear",
+    "coop_mix"
+]
 
 class RequestEnv(gym.Env):
     def __init__(self, planner, bits_price=0.1, render_mode=None):
@@ -33,10 +44,6 @@ class RequestEnv(gym.Env):
             int(driving_action), reply
         )
 
-        print(f"rewards: {reward}\n"
-              f"terminated: {terminated}\n"
-              f"truncated: {truncated}\n")
-
         return self.obs, reward, terminated, truncated, info
 
     def close(self):
@@ -44,8 +51,12 @@ class RequestEnv(gym.Env):
 
 def train_ppo(planner, total_timesteps=4_096, bits_price=0.1,render_mode=None):
     env = RequestEnv(planner, bits_price=bits_price, render_mode=render_mode)
-    eval_env = RequestEnv(planner, bits_price=bits_price)
-
+    eval_env = Monitor(
+        RequestEnv(
+            planner,
+            bits_price=bits_price
+        )
+    )
     try:
         check_env(env)
         policy = PPO("MlpPolicy",

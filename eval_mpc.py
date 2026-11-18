@@ -2,75 +2,91 @@
 import numpy as np
 from environment import DrivingEnv
 from mpc_planner import planner as mpc_plan
-from test_planner import planner
+from test_planner import planner as heuristic_plan
 
 scenarios = [
-    "lead_braking",
-    "truck_occlusion",
-    "mixed",
+    # "lead_braking",
+    # "truck_occlusion",
+    # "mixed",
+    # "coop_easy",
     "coop_front",
-    "coop_easy",
-    "coop_rear",
-    "coop_mix"
+    # "coop_rear",
+    # "coop_mix"
 ]
+episodes_per_scenario = 50
+seeds = [11 + i for i in range(episodes_per_scenario)]
 
-episodes_per_scenario = 10
+def evaluate(planner, name):
+    sim = DrivingEnv(bits_price=0.1, render_mode=None)
+    results = []
 
-sim = DrivingEnv(bits_price=0.1, render_mode="human")
+    try:
+        for scenario in scenarios:
+            for seed in seeds:
+                sim.scenario_choice = scenario
+                obs, info = sim.reset(seed=seed)
 
-results = []
+                terminated = False
+                truncated = False
+                episode_reward = 0.0
+                actions = []
+                while not terminated and not truncated:
+                    request_action = 1
+                    reply = sim.request(request_action)
 
-try:
-    for scenario in scenarios:
-        for episode in range(episodes_per_scenario):
-            sim.scenario_choice = scenario
-            obs, info = sim.reset(seed=0 + episode)
+                    driving_action = planner(
+                        obs,
+                        reply,
+                        request_action
+                    )
 
-            terminated = False
-            truncated = False
-            episode_reward = 0.0
+                    obs, reward, terminated, truncated, info = sim.step(
+                        driving_action,
+                        reply
+                    )
 
-            while not terminated and not truncated:
-                request_action = 0
-                reply = sim.request(request_action)
+                    episode_reward += reward
+                    actions.append(int(driving_action))
 
-                driving_action = mpc_plan(
-                    obs,
-                    reply,
-                    request_action
-                )
+                results.append({
+                    "name": name,
+                    "seed": seed,
+                    "scenario": scenario,
+                    "success": info["success"],
+                    "collision": info["collision"],
+                    "steps": info["steps"],
+                    "reward": episode_reward,
+                    "bits": sim.bits,
+                    "actions": actions
+                })
 
-                obs, reward, terminated, truncated, info = sim.step(
-                    driving_action,
-                    reply
-                )
+    finally:
+        sim.close()
 
-                episode_reward += reward
+    print(f"\nOverall results for {name}")
+    print("Success rate:", np.mean([r["success"] for r in results]))
+    print("Collision rate:", np.mean([r["collision"] for r in results]))
+    print("Average steps:", np.mean([r["steps"] for r in results]))
+    print("Average reward:", np.mean([r["reward"] for r in results]))
+    print("Average bits:", np.mean([r["bits"] for r in results]))
 
-            results.append({
-                "scenario": scenario,
-                "success": info["success"],
-                "collision": info["collision"],
-                "steps": info["steps"],
-                "reward": episode_reward,
-                "bits": sim.bits
-            })
+    return results
 
-            print(
-                scenario,
-                "Episode:", episode + 1,
-                "Success:", info["success"],
-                "Collision:", info["collision"],
-                "Steps:", info["steps"],
-                "Reward:", round(episode_reward, 3)
-            )
 
-finally:
-    sim.close()
+heuristic_results = evaluate(heuristic_plan, "hueristic")
+mpc_results = evaluate(mpc_plan, "mpc")
 
-print("\nOverall results")
-print("Success rate:", np.mean([r["success"] for r in results]))
-print("Collision rate:", np.mean([r["collision"] for r in results]))
-print("Average steps:", np.mean([r["steps"] for r in results]))
-print("Average reward:", np.mean([r["reward"] for r in results]))
-print("Average bits:", np.mean([r["bits"] for r in results]))
+print("\nPer-episode comparison")
+
+for h, m in zip(heuristic_results, mpc_results):
+    print(f"\nSeed {h['seed']}")
+    print(f"Heuristic actions: {h['actions']}")
+    print(f"MPC actions:       {m['actions']}")
+    print(
+        f"Heuristic: success={h['success']}, "
+        f"collision={h['collision']}"
+    )
+    print(
+        f"MPC:       success={m['success']}, "
+        f"collision={m['collision']}"
+    )

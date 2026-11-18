@@ -6,8 +6,8 @@ LANE_RIGHT = 2
 ACCELERATE = 3
 BRAKE = 4
 
+LIDAR_RANGE = 60.0
 
-# TODO: UPDATE WITH LIDAR INFO
 def planner(obs, reply, request_action=0):
     # decode observation
     ego_speed = obs[32] * 40
@@ -27,7 +27,31 @@ def planner(obs, reply, request_action=0):
             return BRAKE
         if neighbor == "rear" and data == "accelerate":
             return BRAKE
-    if kind == "unavailable":
+    elif kind == "lidar":
+        lidar = np.asarray(data, dtype=np.float32).reshape(16, 2) / 32767.0
+        distances = lidar[:, 0]
+        relative_speeds = lidar[:, 1]
+
+        lidar_distance = distances[0] * LIDAR_RANGE
+        lidar_speed = relative_speeds[0] * LIDAR_RANGE
+
+        if neighbor == "front":
+            if lidar_speed != 0:
+                # low value means about to collide
+                dist_speed_ratio = lidar_distance / abs(lidar_speed)
+
+                if lidar_distance < 40.0 and dist_speed_ratio < 4:
+                    return BRAKE
+
+        elif neighbor == "rear":
+            if lidar_speed != 0:
+                # low value means about to collide
+                dist_speed_ratio = lidar_distance / abs(lidar_speed)
+
+                if lidar_distance < 40.0 and dist_speed_ratio < 4:
+                    return MAINTAIN
+                return ACCELERATE
+    elif kind == "unavailable":
         return MAINTAIN
 
     target_y = target_lane * 4.0
